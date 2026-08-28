@@ -1,0 +1,7 @@
+node_modules/
+golocation.db
+*.db-shm
+*.db-wal
+assets/uploads/*
+!assets/uploads/.gitkeep
+.env

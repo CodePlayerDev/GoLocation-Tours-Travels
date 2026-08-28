@@ -7,17 +7,25 @@ const multer = require("multer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const db = new Database("golocation.db");
+const dataDir = process.env.DATA_DIR || __dirname;
+fs.mkdirSync(dataDir, {recursive:true});
+const db = new Database(path.join(dataDir, "golocation.db"));
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || "";
 const adminSessions = new Set();
-fs.mkdirSync(path.join(__dirname, "assets", "uploads"), {recursive:true});
+const uploadsDir = path.join(dataDir, "uploads");
+fs.mkdirSync(uploadsDir, {recursive:true});
 const upload = multer({
-  dest: path.join(__dirname, "assets", "uploads"),
+  dest: uploadsDir,
   limits: {fileSize: 5 * 1024 * 1024},
   fileFilter: (req, file, callback) => callback(null, ["image/jpeg","image/png","image/webp"].includes(file.mimetype))
 });
+const excelUpload = multer({memoryStorage:true, limits:{files:20, fileSize:10 * 1024 * 1024}});
+const columnValue = (row, names) => {
+  const key = Object.keys(row).find(item => names.includes(item.toLowerCase().replace(/[^a-z]/g, "")));
+  return key ? String(row[key] || "").trim() : "";
+};
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS hotels (
@@ -40,6 +48,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   hotel_name TEXT NOT NULL,
   room_id INTEGER,
   room_name TEXT,
+  occupancy INTEGER DEFAULT 2,
   customer_name TEXT NOT NULL,
   phone TEXT NOT NULL,
   email TEXT,
@@ -68,17 +77,21 @@ CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value TEXT NOT N
 `);
 try { db.exec("ALTER TABLE bookings ADD COLUMN room_id INTEGER"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE bookings ADD COLUMN room_name TEXT"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
+try { db.exec("ALTER TABLE bookings ADD COLUMN occupancy INTEGER DEFAULT 2"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE hotels ADD COLUMN image TEXT DEFAULT ''"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE hotels ADD COLUMN category TEXT DEFAULT ''"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE hotels ADD COLUMN phone TEXT DEFAULT ''"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE hotels ADD COLUMN website TEXT DEFAULT ''"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
+try { db.exec("ALTER TABLE room_categories ADD COLUMN single_price INTEGER DEFAULT 0"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
+try { db.exec("ALTER TABLE room_categories ADD COLUMN double_price INTEGER DEFAULT 0"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
+try { db.exec("ALTER TABLE room_categories ADD COLUMN triple_price INTEGER DEFAULT 0"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 
 const defaultSettings = {
   site_name: "GoLocation Tours & Travels", phone: "+91 74405 80498", email: "info@golocation.in",
   address: "Bhopal, Madhya Pradesh, India", hero_title: "Find Your Perfect Stay Across India",
   hero_copy: "Comfortable hotels, amazing destinations and unforgettable experiences — all in one place."
 };
-const indianCities = ["Agra","Ahmedabad","Amritsar","Aurangabad","Bengaluru","Bhopal","Bhubaneswar","Chandigarh","Chennai","Coimbatore","Dehradun","Delhi","Dharamshala","Gandhinagar","Goa","Gurugram","Guwahati","Gwalior","Haridwar","Hyderabad","Indore","Jaipur","Jaisalmer","Jalandhar","Jammu","Jodhpur","Kanpur","Kochi","Kolkata","Kota","Lucknow","Ludhiana","Madurai","Manali","Mangaluru","Meerut","Mumbai","Munnar","Mysuru","Nagpur","Nashik","Noida","Ooty","Patna","Pondicherry","Prayagraj","Pune","Rishikesh","Ranchi","Shimla","Siliguri","Srinagar","Surat","Thane","Thiruvananthapuram","Udaipur","Vadodara","Varanasi","Vijayawada","Visakhapatnam","Wayanad"];
+  const indianCities = ["Agra","Ahmedabad","Amritsar","Aurangabad","Balaghat","Bengaluru","Bhopal","Bhubaneswar","Chandigarh","Chennai","Coimbatore","Dehradun","Delhi","Dharamshala","Gandhinagar","Goa","Gurugram","Guwahati","Gwalior","Haridwar","Hyderabad","Indore","Jabalpur","Jaipur","Jaisalmer","Jodhpur","Katni","Khandwa","Khargone","Kochi","Kolkata","Kota","Lucknow","Ludhiana","Mandsaur","Manali","Mangaluru","Meerut","Morena","Mumbai","Munnar","Mysuru","Nagpur","Nashik","Neemuch","Noida","Ooty","Patna","Pondicherry","Prayagraj","Pune","Raisen","Ratlam","Rewa","Rishikesh","Ranchi","Satna","Sehore","Shahdol","Shimla","Shivpuri","Siliguri","Singrauli","Srinagar","Sagar","Surat","Thane","Thiruvananthapuram","Udaipur","Ujjain","Vadodara","Varanasi","Vidisha","Vijayawada","Visakhapatnam","Wayanad"];
 const settingInsert = db.prepare("INSERT OR IGNORE INTO site_settings(key,value) VALUES(?,?)");
 Object.entries(defaultSettings).forEach(([key,value]) => settingInsert.run(key,value));
 
@@ -95,9 +108,32 @@ if (!count) {
   ].forEach(h => insert.run(...h));
 }
 
+const hotelsWithoutRooms = db.prepare(`
+  SELECT h.id, h.name, h.price
+  FROM hotels h
+  WHERE NOT EXISTS (SELECT 1 FROM room_categories r WHERE r.hotel_id = h.id)
+`).all();
+const defaultRoom = db.prepare(`
+  INSERT INTO room_categories(hotel_id,name,description,price,max_guests,inventory,amenities)
+  VALUES(?,?,?,?,?,?,?)
+`);
+const addDefaultRooms = db.transaction(() => hotelsWithoutRooms.forEach(hotel => {
+  defaultRoom.run(
+    hotel.id,
+    "Deluxe Room",
+    "Comfortable deluxe room with essential amenities for a pleasant stay.",
+    2500,
+    2,
+    5,
+    "WiFi • AC • TV • Attached bathroom"
+  );
+}));
+addDefaultRooms();
+db.prepare("UPDATE room_categories SET price=2500,single_price=2100,double_price=2500,triple_price=3500 WHERE lower(name)='deluxe room'").run();
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
-app.use("/uploads", express.static(path.join(__dirname, "assets", "uploads")));
+app.use("/uploads", express.static(uploadsDir));
 
 function requireAdmin(req, res, next) {
   const token = req.get("Authorization")?.replace("Bearer ", "");
@@ -153,6 +189,12 @@ app.get("/api/hotels/:id", (req,res) => {
   res.json(hotel);
 });
 
+app.get("/api/featured-hotels", (req,res) => {
+  const featuredCities = ["Bhopal","Indore","Jabalpur","Gwalior","Ujjain","Sagar"];
+  const hotels = featuredCities.map(city => db.prepare("SELECT * FROM hotels WHERE active=1 AND city=? ORDER BY rating DESC, id DESC LIMIT 1").get(city)).filter(Boolean);
+  res.json(hotels.map(hotel => ({...hotel, rooms: db.prepare("SELECT * FROM room_categories WHERE hotel_id=? AND active=1").all(hotel.id)})));
+});
+
 app.get("/api/settings", (req,res) => res.json(Object.fromEntries(db.prepare("SELECT key,value FROM site_settings").all().map(item => [item.key,item.value]))));
 app.get("/api/cities", (req,res) => {
   const storedCities = db.prepare("SELECT DISTINCT city FROM hotels WHERE active=1").all().map(item => item.city);
@@ -160,18 +202,25 @@ app.get("/api/cities", (req,res) => {
 });
 
 app.post("/api/bookings", (req,res) => {
-  const {hotelId,hotelName,roomId=null,roomName="",customerName,phone,email,checkin,checkout,guests,amount,hotelCost=0} = req.body;
+  const {hotelId,hotelName,roomId=null,roomName="",occupancy=2,customerName,phone,email,checkin,checkout,guests,amount,hotelCost=0} = req.body;
   if (!hotelName || !customerName || !phone || !checkin || !checkout) {
     return res.status(400).json({error:"Required booking fields are missing."});
   }
   if (new Date(checkout) <= new Date(checkin)) {
     return res.status(400).json({error:"Check-out must be after check-in."});
   }
+  const selectedRoom = roomId ? db.prepare("SELECT * FROM room_categories WHERE id=? AND hotel_id=? AND active=1").get(roomId, hotelId) : null;
+  if (roomId && !selectedRoom) return res.status(400).json({error:"Selected room is not available."});
+  const safeOccupancy = Number(occupancy);
+  if (!Number.isInteger(safeOccupancy) || safeOccupancy < 1 || safeOccupancy > 3) return res.status(400).json({error:"Choose a valid occupancy."});
+  const tariff = selectedRoom ? (safeOccupancy === 1 ? selectedRoom.single_price : safeOccupancy === 2 ? selectedRoom.double_price : selectedRoom.triple_price) : Number(amount || 0);
+  const nights = Math.ceil((new Date(checkout) - new Date(checkin)) / 86400000);
+  const verifiedAmount = tariff * nights;
   const code = "GL-" + crypto.randomBytes(4).toString("hex").toUpperCase();
   const result = db.prepare(`
-    INSERT INTO bookings(booking_code,hotel_id,hotel_name,room_id,room_name,customer_name,phone,email,checkin,checkout,guests,amount,hotel_cost)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(code,hotelId||null,hotelName,roomId||null,roomName,customerName,phone,email||"",checkin,checkout,guests||"2 Adults, 1 Room",amount||0,hotelCost);
+    INSERT INTO bookings(booking_code,hotel_id,hotel_name,room_id,room_name,occupancy,customer_name,phone,email,checkin,checkout,guests,amount,hotel_cost)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(code,hotelId||null,hotelName,roomId||null,roomName,safeOccupancy,customerName,phone,email||"",checkin,checkout,guests||`${safeOccupancy} Guest(s), 1 Room`,verifiedAmount,selectedRoom ? verifiedAmount : hotelCost);
   res.status(201).json({id:result.lastInsertRowid, bookingCode:code, status:"pending", paymentStatus:"unpaid"});
 });
 
@@ -218,6 +267,29 @@ app.post("/api/admin/import-google", requireAdmin, async (req,res) => {
   } catch (error) { res.status(502).json({error:"Google Places request failed."}); }
 });
 
+app.post("/api/admin/import-excel", requireAdmin, excelUpload.array("files", 20), (req,res) => {
+  if (!req.files?.length) return res.status(400).json({error:"Choose one or more Excel files."});
+  const XLSX = require("xlsx");
+  const insert = db.prepare("INSERT INTO hotels(name,city,area,price,rating,amenities,category,phone,website,image,active) VALUES(?,?,?,?,?,?,?,?,?,?,1)");
+  let imported = 0, skipped = 0, rowsRead = 0;
+  const importRows = db.transaction(() => req.files.forEach(file => {
+    const workbook = XLSX.read(file.buffer, {type:"buffer"});
+    workbook.SheetNames.forEach(sheetName => XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {defval:""}).forEach(row => {
+      const name = columnValue(row,["hotelname","name","hotel"]);
+      if (!name || /^s\.no|^hotelname$/i.test(name)) return;
+      rowsRead++;
+      const city = columnValue(row,["city","destination"]) || file.originalname.replace(/[_-]?\d+.*|\.xlsx$/gi, "").replace(/hotels?(directory|details|list|data)?/gi, "").trim();
+      const category = columnValue(row,["category","type","hotelcategory"]);
+      const phone = columnValue(row,["contactnumber","phone","contact","mobilenumber"]);
+      const area = columnValue(row,["address","area","location"]);
+      const website = columnValue(row,["websitebookinglink","website","bookinglink"]);
+      if (!city || db.prepare("SELECT id FROM hotels WHERE lower(name)=lower(?) AND lower(city)=lower(?)").get(name,city)) { skipped++; return; }
+      insert.run(name,city,area,0,0,category,category,phone,website,""); imported++;
+    }));
+  }));
+  try { importRows(); res.json({imported,skipped,rowsRead}); } catch (error) { res.status(400).json({error:"Could not read one of the Excel files. Use .xlsx files with a header row."}); }
+});
+
 app.post("/api/hotels", requireAdmin, upload.single("image"), (req,res) => {
   const {name, city, area, price, rating=0, amenities="", category="", phone="", website=""} = req.body;
   if (!name || !city || !Number.isFinite(Number(price))) return res.status(400).json({error:"Name, city and price are required."});
@@ -239,7 +311,7 @@ app.post("/api/hotels/:id/image", requireAdmin, upload.single("image"), (req,res
   if (!req.file) return res.status(400).json({error:"Choose a JPG, PNG or WebP image."});
   const hotel = db.prepare("SELECT image FROM hotels WHERE id=?").get(req.params.id);
   if (!hotel) return res.status(404).json({error:"Hotel not found."});
-  if (hotel.image) fs.unlink(path.join(__dirname, hotel.image.replace(/^\//, "")), () => {});
+  if (hotel.image) fs.unlink(path.join(uploadsDir, path.basename(hotel.image)), () => {});
   const image = `/uploads/${req.file.filename}`;
   db.prepare("UPDATE hotels SET image=? WHERE id=?").run(image, req.params.id);
   res.json(db.prepare("SELECT * FROM hotels WHERE id=?").get(req.params.id));
@@ -248,7 +320,7 @@ app.post("/api/hotels/:id/image", requireAdmin, upload.single("image"), (req,res
 app.delete("/api/hotels/:id/image", requireAdmin, (req,res) => {
   const hotel = db.prepare("SELECT image FROM hotels WHERE id=?").get(req.params.id);
   if (!hotel) return res.status(404).json({error:"Hotel not found."});
-  if (hotel.image) fs.unlink(path.join(__dirname, hotel.image.replace(/^\//, "")), () => {});
+  if (hotel.image) fs.unlink(path.join(uploadsDir, path.basename(hotel.image)), () => {});
   db.prepare("UPDATE hotels SET image='' WHERE id=?").run(req.params.id);
   res.json({ok:true});
 });
@@ -260,7 +332,7 @@ app.delete("/api/hotels/:id", requireAdmin, (req,res) => {
     return db.prepare("DELETE FROM hotels WHERE id=?").run(id).changes;
   });
   if (!remove(req.params.id)) return res.status(404).json({error:"Hotel not found."});
-  if (hotel?.image) fs.unlink(path.join(__dirname, hotel.image.replace(/^\//, "")), () => {});
+  if (hotel?.image) fs.unlink(path.join(uploadsDir, path.basename(hotel.image)), () => {});
   res.json({ok:true});
 });
 

@@ -18,6 +18,9 @@ function render(list=hotels, searched=false){
  <div class="actions">${h.source === 'google' ? `<a class="book" href="${h.mapsUrl}" target="_blank" rel="noopener">Open in Google Maps</a>` : `<a class="book" href="hotel.html?id=${h.id}">View Rooms & Book</a>`}<button class="enquire" onclick="openEnquiry('${h.name.replace(/'/g, "\\'")}')">WhatsApp</button></div></div></article>`).join("");
 }
 render([], false);
+fetch("/api/featured-hotels").then(response => response.ok ? response.json() : []).then(data => {
+ if (data.length) { hotels = data; render(data, true); count.textContent = "Featured stays from major cities"; }
+}).catch(() => {});
 fetch("/api/cities").then(response => response.ok ? response.json() : []).then(cities => {
  document.querySelector("#cityOptions").innerHTML = cities.map(city => `<option value="${city}"></option>`).join("");
 }).catch(() => {});
