@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotel rooms | GoLocation</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .details-page{padding:46px 0 70px;background:#f7fafc;min-height:calc(100vh - 76px)}
+    .back{color:#0868dc;text-decoration:none;font-weight:700}.hotel-hero{display:grid;grid-template-columns:1.1fr 1fr;gap:30px;align-items:center;margin-top:22px}.hotel-photo{min-height:310px;border-radius:18px;background:#d9e8f2 center/cover no-repeat}.hotel-copy h1{font-size:42px;margin:8px 0 12px}.hotel-copy p{color:#607a92}.room-section{margin-top:42px}.room-section h2{font-size:28px}.room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:18px}.room-card{background:#fff;border:2px solid #e1eaf1;border-radius:12px;padding:20px;cursor:pointer;transition:.2s}.room-card.selected{border-color:#0878d8;box-shadow:0 8px 24px #0878d820}.room-card h3{margin:0 0 8px}.room-card p{color:#657e94;min-height:42px}.room-price{font-size:23px;font-weight:800;color:#123e68}.room-price small{font-size:12px;font-weight:500}.room-card button{margin-top:14px;width:100%;padding:11px;border:0;border-radius:6px;background:#0878d8;color:#fff;font-weight:700}.booking-panel{background:#fff;border-radius:12px;padding:24px;margin-top:25px;max-width:720px;display:none}.booking-panel.visible{display:block}.booking-panel form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.booking-panel input,.booking-panel select{padding:12px;border:1px solid #ccdce8;border-radius:6px}.booking-panel button,.booking-panel p{grid-column:1/-1}.booking-message{color:#0878d8;font-weight:700}@media(max-width:700px){.hotel-hero{grid-template-columns:1fr}.hotel-copy h1{font-size:32px}.booking-panel form{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header class="topbar"><div class="container nav"><a class="brand" href="index.html"><span class="pin">◉</span><span>GoLocation<small>Tours & Travels</small></span></a><nav><a href="index.html#hotels">Hotels</a><a href="index.html#destinations">Destinations</a><a href="index.html#contact">Contact</a></nav></div></header>
+<main class="details-page"><div class="container"><a class="back" href="index.html#hotels">← Back to hotels</a><div id="hotelDetails"><p>Loading hotel...</p></div></div></main>
+<script src="hotel.js"></script>
+</body>
+</html>

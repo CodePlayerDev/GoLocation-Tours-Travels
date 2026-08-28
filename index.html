@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoLocation Tours & Travels | Hotels Across India</title>
+  <meta name="description" content="Book hotels across India with GoLocation Tours & Travels. Book online or enquire on WhatsApp.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="container nav">
+    <a class="brand" href="#"><span class="pin">◉</span><span>GoLocation<small>Tours & Travels</small></span></a>
+    <nav>
+      <a class="active" href="#home">Home</a><a href="#hotels">Hotels</a><a href="#destinations">Destinations</a>
+      <a href="#about">About Us</a><a href="#contact">Contact</a>
+    </nav>
+    <div class="nav-right"><a href="#bookings">My Bookings</a><a href="tel:+917440580498">☎ +91 74405 80498</a><a class="wa" href="https://wa.me/917440580498" target="_blank">WhatsApp</a></div>
+  </div>
+</header>
+
+<main>
+<section id="home" class="hero">
+  <div class="hero-overlay"></div>
+  <div class="container hero-content">
+    <p class="eyebrow">EXPLORE • STAY • EXPERIENCE</p>
+    <h1>Find Your Perfect Stay<br>Across <span>India</span></h1>
+    <p class="hero-copy">Comfortable hotels, amazing destinations and unforgettable experiences — all in one place.</p>
+    <form id="searchForm" class="searchbox">
+      <label>Destination<input id="destination" list="cityOptions" autocomplete="off" placeholder="Where do you want to go?"><datalist id="cityOptions"></datalist></label>
+      <label>Check-in<input id="checkin" type="date"></label>
+      <label>Check-out<input id="checkout" type="date"></label>
+      <label>Guests & Rooms<select id="guests"><option>2 Adults, 1 Room</option><option>1 Adult, 1 Room</option><option>4 Adults, 2 Rooms</option><option>6 Adults, 3 Rooms</option></select></label>
+      <button type="submit">⌕ Search Hotels</button>
+    </form>
+  </div>
+</section>
+
+<section id="destinations" class="section container">
+  <div class="section-head"><div><h2>📍 Popular Destinations</h2><p>Explore India's most loved travel spots</p></div><a href="#hotels">View All Destinations →</a></div>
+  <div class="dest-grid">
+    <button class="dest" data-dest="Goa"><b>Goa</b><span>Beaches & Nightlife</span></button>
+    <button class="dest" data-dest="Manali"><b>Manali</b><span>Mountains & Adventure</span></button>
+    <button class="dest" data-dest="Jaipur"><b>Jaipur</b><span>History & Culture</span></button>
+    <button class="dest" data-dest="Kerala"><b>Kerala</b><span>Backwaters & Nature</span></button>
+    <button class="dest" data-dest="Udaipur"><b>Udaipur</b><span>Lakes & Royalty</span></button>
+    <button class="dest" data-dest="Shimla"><b>Shimla</b><span>Hills & Peace</span></button>
+  </div>
+</section>
+
+<section id="hotels" class="section container">
+  <div class="section-head"><div><h2>🛏 Featured Hotels</h2><p>Handpicked stays for your perfect getaway</p></div><span id="resultCount"></span></div>
+  <div id="hotelGrid" class="hotel-grid"></div>
+</section>
+
+<section id="about" class="why">
+  <div class="container">
+    <div class="section-head"><div><h2>Why Choose GoLocation?</h2><p>Your trusted travel partner in India</p></div></div>
+    <div class="why-grid">
+      <div><strong>🏷</strong><h3>Best Price Guarantee</h3><p>Great deals on selected stays.</p></div>
+      <div><strong>🛡</strong><h3>Safe & Secure Booking</h3><p>Your booking details stay protected.</p></div>
+      <div><strong>🎧</strong><h3>24/7 Customer Support</h3><p>We're here whenever you need us.</p></div>
+      <div><strong>📍</strong><h3>Wide Hotel Network</h3><p>Stays across destinations in India.</p></div>
+      <div><strong>★</strong><h3>Verified Reviews</h3><p>Helpful reviews from travellers.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="promo container">
+  <div><p>PLAN YOUR NEXT GETAWAY</p><h2>Book Hotels, Flights & Custom Packages</h2><span>Your dream journey starts here with GoLocation Tours & Travels.</span></div>
+  <a class="primary" href="#contact">Explore More →</a>
+</section>
+</main>
+
+<footer id="contact">
+  <div class="container footer-grid">
+    <div><a class="brand light" href="#"><span class="pin">◉</span><span>GoLocation<small>Tours & Travels</small></span></a><p>Your Journey. Our Priority.</p></div>
+    <div><h4>Quick Links</h4><a href="#home">Home</a><a href="#hotels">Hotels</a><a href="#destinations">Destinations</a><a href="#about">About Us</a></div>
+    <div><h4>Policies</h4><a href="#">Cancellation Policy</a><a href="#">Terms & Conditions</a><a href="#">Privacy Policy</a><a href="#">Refund Policy</a></div>
+    <div><h4>Contact Us</h4><p>☎ +91 74405 80498</p><p>✉ info@golocation.in</p><p>📍 Bhopal, Madhya Pradesh, India</p><p>Mon–Sun · 9:00 AM–10:00 PM</p></div>
+  </div>
+  <div class="copyright">© 2026 GoLocation Tours and Travels. All Rights Reserved.</div>
+</footer>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <button class="close" id="closeModal">×</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
