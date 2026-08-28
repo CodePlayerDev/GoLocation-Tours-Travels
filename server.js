@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   booking_code TEXT UNIQUE NOT NULL,
   hotel_id INTEGER,
   hotel_name TEXT NOT NULL,
+  hotel_city TEXT,
   room_id INTEGER,
   room_name TEXT,
   occupancy INTEGER DEFAULT 2,
@@ -78,6 +79,7 @@ CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value TEXT NOT N
 try { db.exec("ALTER TABLE bookings ADD COLUMN room_id INTEGER"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE bookings ADD COLUMN room_name TEXT"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE bookings ADD COLUMN occupancy INTEGER DEFAULT 2"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
+try { db.exec("ALTER TABLE bookings ADD COLUMN hotel_city TEXT"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE hotels ADD COLUMN image TEXT DEFAULT ''"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE hotels ADD COLUMN category TEXT DEFAULT ''"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
 try { db.exec("ALTER TABLE hotels ADD COLUMN phone TEXT DEFAULT ''"); } catch (error) { if (!error.message.includes("duplicate column name")) throw error; }
@@ -209,6 +211,7 @@ app.post("/api/bookings", (req,res) => {
   if (new Date(checkout) <= new Date(checkin)) {
     return res.status(400).json({error:"Check-out must be after check-in."});
   }
+  const selectedHotel = hotelId ? db.prepare("SELECT city FROM hotels WHERE id=?").get(hotelId) : null;
   const selectedRoom = roomId ? db.prepare("SELECT * FROM room_categories WHERE id=? AND hotel_id=? AND active=1").get(roomId, hotelId) : null;
   if (roomId && !selectedRoom) return res.status(400).json({error:"Selected room is not available."});
   const safeOccupancy = Number(occupancy);
@@ -218,14 +221,14 @@ app.post("/api/bookings", (req,res) => {
   const verifiedAmount = tariff * nights;
   const code = "GL-" + crypto.randomBytes(4).toString("hex").toUpperCase();
   const result = db.prepare(`
-    INSERT INTO bookings(booking_code,hotel_id,hotel_name,room_id,room_name,occupancy,customer_name,phone,email,checkin,checkout,guests,amount,hotel_cost)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(code,hotelId||null,hotelName,roomId||null,roomName,safeOccupancy,customerName,phone,email||"",checkin,checkout,guests||`${safeOccupancy} Guest(s), 1 Room`,verifiedAmount,selectedRoom ? verifiedAmount : hotelCost);
+    INSERT INTO bookings(booking_code,hotel_id,hotel_name,hotel_city,room_id,room_name,occupancy,customer_name,phone,email,checkin,checkout,guests,amount,hotel_cost)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(code,hotelId||null,hotelName,selectedHotel?.city || "",roomId||null,roomName,safeOccupancy,customerName,phone,email||"",checkin,checkout,guests||`${safeOccupancy} Guest(s), 1 Room`,verifiedAmount,selectedRoom ? verifiedAmount : hotelCost);
   res.status(201).json({id:result.lastInsertRowid, bookingCode:code, status:"pending", paymentStatus:"unpaid"});
 });
 
 app.get("/api/bookings", requireAdmin, (req,res) => {
-  const rows = db.prepare("SELECT * FROM bookings ORDER BY id DESC").all();
+  const rows = db.prepare("SELECT b.*, COALESCE(b.hotel_city, h.city, '') AS hotel_city FROM bookings b LEFT JOIN hotels h ON h.id=b.hotel_id ORDER BY b.id DESC").all();
   res.json(rows);
 });
 
